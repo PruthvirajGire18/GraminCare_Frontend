@@ -117,6 +117,11 @@ export async function getPatients(params = {}) {
   return { patients: filtered.slice(start, start + limit), total: filtered.length, page, limit }
 }
 
+export async function getAshaReferralQr(referralId) {
+  const { data } = await api.get(`/asha/referrals/${referralId}/qr`)
+  return data
+}
+
 export async function createPatient(payload) {
   const workerId = currentWorkerId(await getCachedUser())
   const patient = await enqueuePatientCreate(payload, workerId)

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSyncStatus } from '../hooks/useSyncStatus.js'
-import { getAshaDashboard } from '../services/asha.service.js'
+import { getAshaDashboard, getAshaReferralQr } from '../services/asha.service.js'
+import { createReferralQrDataUrl } from '../utils/referralQr.js'
 
 const metrics = [
   { key: 'totalPatients', label: 'My patients', href: '/asha/patients' },
@@ -15,6 +16,9 @@ function ASHADashboardPage() {
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [qrReferral, setQrReferral] = useState(null)
+  const [qrLoadingId, setQrLoadingId] = useState('')
+  const [qrError, setQrError] = useState('')
 
   useEffect(() => {
     let active = true
@@ -26,6 +30,22 @@ function ASHADashboardPage() {
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [])
+
+  async function showReferralQr(referralId) {
+    setQrLoadingId(referralId)
+    setQrError('')
+    setQrReferral(null)
+    try {
+      const result = await getAshaReferralQr(referralId)
+      const image = await createReferralQrDataUrl(result.verificationUrl)
+      setQrReferral({ id: referralId, image, expiresAt: result.expiresAt })
+    } catch (requestError) {
+      setQrReferral(null)
+      setQrError(requestError.response?.data?.message || requestError.message || 'Referral QR could not be loaded.')
+    } finally {
+      setQrLoadingId('')
+    }
+  }
 
   return (
     <main className="content-width asha-dashboard">
@@ -59,6 +79,25 @@ function ASHADashboardPage() {
           <span className="metric-note">{isOnline ? 'Waiting to sync' : 'Saved on this device'}</span>
         </div>
       </section>
+
+      {summary?.referralItems?.length > 0 && <section className="asha-queue-section" aria-labelledby="asha-referrals-heading">
+        <div className="asha-page-heading"><div><p className="eyebrow"><span className="eyebrow-dot" /> Care coordination</p><h2 id="asha-referrals-heading">🚨 Referral Generated</h2></div></div>
+        <div className="asha-patient-list">{summary.referralItems.map((referral) => <article className="asha-patient-card" key={referral.id}>
+          <div>
+            <strong>Patient: {referral.patientCode}</strong>
+            <p>Priority: <span className={`referral-priority referral-${referral.priority.toLowerCase()}`}>{referral.priority}</span></p>
+            {referral.destination?.facilityName && <p>Destination: {referral.destination.facilityName}{referral.destination.address ? ` · ${referral.destination.address}` : ''}</p>}
+            <small>Created {new Date(referral.createdAt).toLocaleString()} · Expires {new Date(referral.expiresAt).toLocaleString()}</small>
+          </div>
+          <button className="asha-secondary-action" type="button" disabled={qrLoadingId === referral.id} onClick={() => void showReferralQr(referral.id)}>{qrLoadingId === referral.id ? 'Loading QR…' : 'View QR'}</button>
+          {qrReferral?.id === referral.id && <div className="referral-qr-panel">
+            <img src={qrReferral.image} alt={`Secure referral QR for ${referral.patientCode}`} />
+            <p>Show this QR to the patient for referral verification. It contains only a one-time secure token.</p>
+            <button className="doctor-clear-filters" type="button" onClick={() => setQrReferral(null)}>Close QR</button>
+          </div>}
+        </article>)}</div>
+        {qrError && <p className="auth-error" role="alert">{qrError}</p>}
+      </section>}
 
       {(summary?.doctorFollowUps?.length > 0 || summary?.followUpVisits?.length > 0) && <section className="asha-queue-section" aria-labelledby="asha-follow-ups-heading">
         <div className="asha-page-heading"><div><p className="eyebrow"><span className="eyebrow-dot" /> Care coordination</p><h2 id="asha-follow-ups-heading">Follow-up due</h2></div></div>

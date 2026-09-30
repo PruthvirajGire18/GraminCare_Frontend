@@ -35,6 +35,11 @@ export async function createReferral(patientId, payload) {
   return data
 }
 
+export async function revokeReferral(patientId, referralId) {
+  const { data } = await api.post(`/doctor/cases/${patientId}/referrals/${referralId}/revoke`)
+  return data.referral
+}
+
 export async function getDoctorAssessments() {
   const { data } = await api.get('/doctor/assessments')
   return data.assessments

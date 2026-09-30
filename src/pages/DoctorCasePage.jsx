@@ -5,6 +5,7 @@ import {
   createPrescription,
   createReferral,
   getDoctorCase,
+  revokeReferral,
   takeDoctorCase,
 } from '../services/doctor.service.js'
 
@@ -73,13 +74,18 @@ function DoctorCasePage() {
   const [savingConsultation, setSavingConsultation] = useState(false)
   const [savingPrescription, setSavingPrescription] = useState(false)
   const [savingReferral, setSavingReferral] = useState(false)
+  const [revokingReferralId, setRevokingReferralId] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [consultationId, setConsultationId] = useState('')
   const [referralResult, setReferralResult] = useState(null)
   const [consultationForm, setConsultationForm] = useState({ notes: '', assessment: '', treatmentPlan: '', priority: 'LOW', followUpDate: '', ashaVisitId: '' })
   const [prescriptionForm, setPrescriptionForm] = useState({ items: [blankMedicine()], notes: '' })
-  const [referralReason, setReferralReason] = useState('')
+  const [referralForm, setReferralForm] = useState({
+    reason: '',
+    priority: 'HIGH',
+    destination: { facilityName: '', address: '' },
+  })
 
   const refresh = useCallback(async (initial = false) => {
     if (initial) setLoading(true)
@@ -180,15 +186,30 @@ function DoctorCasePage() {
     setSuccess('')
     setReferralResult(null)
     try {
-      const result = await createReferral(patientId, { consultationId: selectedConsultationId, reason: referralReason })
+      const result = await createReferral(patientId, { consultationId: selectedConsultationId, ...referralForm })
       setReferralResult(result)
-      setReferralReason('')
-      setSuccess('Secure referral created. Copy the token now; it is only returned once.')
+      setReferralForm({ reason: '', priority: 'HIGH', destination: { facilityName: '', address: '' } })
+      setSuccess('Secure referral created. The ASHA worker has been notified and can open its QR from their dashboard.')
       await refresh()
     } catch (requestError) {
       setError(requestError.response?.data?.message || 'Referral could not be created.')
     } finally {
       setSavingReferral(false)
+    }
+  }
+
+  async function handleRevokeReferral(referralId) {
+    setRevokingReferralId(referralId)
+    setError('')
+    setSuccess('')
+    try {
+      await revokeReferral(patientId, referralId)
+      setSuccess('Referral revoked. Its QR token can no longer be used.')
+      await refresh()
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || 'Referral could not be revoked.')
+    } finally {
+      setRevokingReferralId('')
     }
   }
 
@@ -287,14 +308,25 @@ function DoctorCasePage() {
 
         <div className="doctor-case-section">
           <div className="doctor-section-heading"><div><p className="eyebrow"><span className="eyebrow-dot" /> Care coordination</p><h2>Referrals</h2></div></div>
-          {caseData.referrals.map((referral) => <article className="doctor-consultation-card" key={referral._id}><div className="timeline-heading"><strong>{referral.status}</strong><time>{displayDate(referral.createdAt)}</time></div><p>{referral.reason}</p><small>Expires {displayDate(referral.expiresAt)}</small></article>)}
+          {caseData.referrals.map((referral) => <article className="doctor-consultation-card" key={referral._id}>
+            <div className="timeline-heading"><strong>{referral.status} · {referral.priority}</strong><time>{displayDate(referral.createdAt)}</time></div>
+            <p>{referral.reason}</p>
+            {referral.destination?.facilityName && <p><strong>Destination:</strong> {referral.destination.facilityName}{referral.destination.address ? ` · ${referral.destination.address}` : ''}</p>}
+            <small>Expires {displayDate(referral.expiresAt)}</small>
+            {referral.status === 'ACTIVE' && <button className="doctor-clear-filters" type="button" disabled={revokingReferralId === referral._id} onClick={() => void handleRevokeReferral(referral._id)}>{revokingReferralId === referral._id ? 'Revoking…' : 'Revoke referral'}</button>}
+          </article>)}
           {assignedToMe && consultations.length > 0 ? <form className="doctor-action-form" onSubmit={handleReferral}>
             <h3>Refer patient</h3>
             <label>Consultation <select required value={selectedConsultationId} onChange={(event) => setConsultationId(event.target.value)}>{consultations.map((item) => <option key={item._id} value={item._id}>{displayDate(item.createdAt)} · {item.priority}</option>)}</select></label>
-            <label>Referral reason <textarea required maxLength="2000" rows="3" value={referralReason} onChange={(event) => setReferralReason(event.target.value)} /></label>
+            <label>Referral reason <textarea required maxLength="2000" rows="3" value={referralForm.reason} onChange={(event) => setReferralForm((current) => ({ ...current, reason: event.target.value }))} /></label>
+            <div className="doctor-form-grid">
+              <label>Priority <select value={referralForm.priority} onChange={(event) => setReferralForm((current) => ({ ...current, priority: event.target.value }))}><option value="HIGH">HIGH</option><option value="CRITICAL">CRITICAL</option></select></label>
+              <label>Destination facility <input maxLength="160" value={referralForm.destination.facilityName} onChange={(event) => setReferralForm((current) => ({ ...current, destination: { ...current.destination, facilityName: event.target.value } }))} /></label>
+              <label>Destination address <input maxLength="300" value={referralForm.destination.address} onChange={(event) => setReferralForm((current) => ({ ...current, destination: { ...current.destination, address: event.target.value } }))} /></label>
+            </div>
             <button className="doctor-primary-button" type="submit" disabled={savingReferral}>{savingReferral ? 'Creating…' : 'Create secure referral'}</button>
           </form> : <p className="doctor-locked-note">{assignedToMe ? 'Save a consultation before creating a referral.' : 'Take this case before creating a referral.'}</p>}
-          {referralResult && <div className="doctor-referral-token" role="status"><strong>Referral token — copy now</strong><code>{referralResult.token}</code><span>Expires {displayDate(referralResult.referral.expiresAt)}. This token is returned once and does not contain medical history.</span></div>}
+          {referralResult && <div className="doctor-referral-token" role="status"><strong>Referral Generated · {referralResult.referral.priority}</strong><span>ASHA worker was notified. Expires {displayDate(referralResult.referral.expiresAt)}. QR access is available only through the authorized ASHA dashboard.</span></div>}
         </div>
       </section>
       <p className="doctor-ai-disclaimer">Clinical decisions, treatment plans, prescriptions, and referrals are entered by the doctor. AI assessment is preliminary decision support only.</p>

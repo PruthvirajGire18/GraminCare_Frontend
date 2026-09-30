@@ -18,6 +18,7 @@ import PatientVisitCreatePage from './pages/PatientVisitCreatePage.jsx'
 import PatientVisitEditPage from './pages/PatientVisitEditPage.jsx'
 import PendingApprovalPage from './pages/PendingApprovalPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
+import ReferralVerifyPage from './pages/ReferralVerifyPage.jsx'
 import SyncDebugPage from './pages/SyncDebugPage.jsx'
 import { dashboardPathForRole } from './utils/auth.js'
 
@@ -40,6 +41,7 @@ function App() {
             <Route path="register" element={<RegisterPage />} />
             <Route path="pending" element={<PendingApprovalPage />} />
             <Route path="dashboard" element={<DashboardRedirect />} />
+            <Route path="referral/verify" element={<ReferralVerifyPage />} />
             <Route path="admin" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminDashboardPage /></ProtectedRoute>} />
             <Route path="admin/conflicts" element={<ProtectedRoute allowedRoles={['ADMIN']}><ConflictReviewPage /></ProtectedRoute>} />
             <Route path="asha" element={<ProtectedRoute allowedRoles={['ASHA_WORKER']}><ASHADashboardPage /></ProtectedRoute>} />

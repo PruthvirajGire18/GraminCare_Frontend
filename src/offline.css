@@ -1,0 +1,33 @@
+.network-online > span { background: #4e9367; }
+.network-offline > span, .network-sync-failed > span { background: var(--orange); }
+.network-conflict > span { background: #a34b31; }
+.network-syncing > span { background: #bd8a2d; animation: sync-pulse 1s ease-in-out infinite alternate; }
+.network-synced > span { background: #4e9367; }
+@keyframes sync-pulse { to { opacity: .35; } }
+.sync-debug-page > .back-link { display: inline-block; margin-bottom: 17px; }
+.sync-heading { align-items: center; }
+.sync-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 20px 0 30px; padding: 12px 0; border-block: 1px solid var(--line); }
+.sync-toolbar p { margin: 0; color: var(--muted); font-size: 12px; }
+.sync-toolbar p strong { color: var(--ink); font-family: Georgia, serif; font-size: 20px; font-weight: 500; }
+.sync-toolbar button, .retry-operation { min-height: 34px; padding: 7px 10px; border: 1px solid var(--green); border-radius: 3px; color: white; background: var(--green); font-size: 11px; font-weight: 700; cursor: pointer; }
+.sync-toolbar button:disabled, .retry-operation:disabled { opacity: .45; cursor: wait; }
+.sync-section { margin-top: 27px; }
+.sync-section .profile-section-heading { margin-bottom: 10px; }
+.sync-table-wrap { overflow-x: auto; border-top: 1px solid var(--line); }
+.sync-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 11px; }
+.sync-table th { padding: 11px 10px 11px 0; color: var(--muted); font-size: 9px; letter-spacing: .6px; text-transform: uppercase; white-space: nowrap; }
+.sync-table td { padding: 11px 10px 11px 0; border-top: 1px solid var(--line); vertical-align: top; }
+.sync-table code { color: var(--muted); font-size: 10px; }
+.sync-error-detail { display: block; max-width: 250px; margin-top: 5px; color: #913e2a; font-size: 10px; white-space: normal; }
+.status-sync-failed { color: #853f2c; background: #fbe8e2; }
+.status-syncing { color: #78561a; background: #fff3d4; }
+.status-synced { color: #245c46; background: #e4f2e7; }
+.status-pending { color: #78561a; background: #fff3d4; }
+.status-conflict { color: #853f2c; background: #fbe8e2; }
+.sync-conflict-notice { margin: -14px 0 20px; padding: 11px 13px; border-left: 3px solid #a34b31; color: #713a2b; background: #fbe8e2; font-size: 12px; line-height: 1.5; }
+.sync-conflict-detail { display: block; max-width: 300px; margin-top: 6px; color: #713a2b; font-size: 10px; line-height: 1.4; white-space: normal; }
+
+@media (max-width: 600px) {
+  .asha-actions { flex-wrap: wrap; }
+  .sync-toolbar { align-items: start; flex-direction: column; }
+}

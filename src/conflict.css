@@ -1,0 +1,22 @@
+.conflict-review-page > .back-link { display: inline-block; margin-bottom: 18px; }
+.conflict-intro { max-width: 720px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.conflict-list { display: grid; gap: 18px; margin-top: 22px; }
+.conflict-item { padding: 18px 0 20px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: rgba(255, 255, 255, .5); }
+.conflict-item-heading { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
+.conflict-type { color: var(--orange); font-size: 9px; font-weight: 800; letter-spacing: .9px; }
+.conflict-item-heading h2 { margin: 6px 0 0; font-family: Georgia, serif; font-size: 23px; font-weight: 500; }
+.conflict-context { margin: 8px 0 15px; color: var(--muted); font-size: 11px; }
+.conflict-context code { color: var(--green); }
+.conflict-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.conflict-values > div { display: grid; align-content: start; gap: 8px; min-height: 86px; padding: 12px 14px 12px 0; }
+.conflict-values > div + div { padding-left: 14px; border-left: 1px solid var(--line); }
+.conflict-values span, .conflict-values small { color: var(--muted); font-size: 10px; }
+.conflict-values strong { overflow-wrap: anywhere; font-size: 14px; }
+.conflict-values small { font-size: 10px; }
+.custom-conflict-label { display: block; margin-top: 15px; color: var(--ink); font-size: 11px; font-weight: 700; }
+.custom-conflict-input { width: 100%; min-height: 38px; margin-top: 5px; padding: 8px 10px; border: 1px solid #cbd7ce; border-radius: 3px; font: inherit; font-size: 12px; }
+.conflict-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.conflict-actions button { min-height: 36px; padding: 8px 11px; border: 1px solid var(--green); border-radius: 3px; color: var(--green); background: #fff; font-size: 11px; font-weight: 700; cursor: pointer; }
+.conflict-actions .use-incoming-button, .conflict-actions .custom-value-button { color: #fff; background: var(--green); }
+.conflict-actions button:disabled { opacity: .5; cursor: wait; }
+@media (max-width: 650px) { .conflict-values { grid-template-columns: 1fr; } .conflict-values > div + div { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); } }

@@ -6,6 +6,10 @@ const LOCALES = { en: 'en-IN', hi: 'hi-IN', mr: 'mr-IN' }
 
 const translations = {
   hi: {
+    'Doctor care updates': 'डॉक्टर द्वारा दी गई देखभाल', 'Refresh updates': 'जानकारी फिर से लोड करें', 'Loading doctor updates...': 'डॉक्टर की जानकारी लोड हो रही है...',
+    'No doctor care updates yet.': 'अभी डॉक्टर की ओर से कोई जानकारी नहीं है।', 'Doctor care updates are available when you are online.': 'डॉक्टर की जानकारी देखने के लिए इंटरनेट से जुड़ें।', 'Doctor care updates could not be loaded.': 'डॉक्टर की जानकारी लोड नहीं हो सकी।',
+    'Prescriptions': 'दवाइयाँ', 'Consultation care plans': 'डॉक्टर की उपचार योजना', 'Doctor referrals': 'डॉक्टर के रेफ़रल', 'Assessment:': 'जाँच:', 'Treatment plan:': 'उपचार योजना:',
+    'Dosage:': 'खुराक:', 'Frequency:': 'कितनी बार:', 'Duration:': 'अवधि:', 'Instructions:': 'निर्देश:', 'Prescription notes:': 'दवा संबंधी टिप्पणी:', 'Referral reason:': 'रेफ़रल का कारण:', 'Status:': 'स्थिति:', 'No prescription items recorded.': 'दवा का विवरण दर्ज नहीं है।',
     'Workspace navigation': 'कार्य क्षेत्र नेविगेशन', 'Overview': 'अवलोकन', 'Patients': 'मरीज़', 'Sync status': 'सिंक स्थिति',
     'Cases': 'मामले', 'Review conflicts': 'टकराव की समीक्षा', 'User management': 'उपयोगकर्ता प्रबंधन', 'Audit log': 'ऑडिट लॉग',
     'Choose language': 'भाषा चुनें',
@@ -104,6 +108,10 @@ const translations = {
     ' is too long': ' बहुत लंबा है', ' must be between ': ' का मान होना चाहिए: ',
   },
   mr: {
+    'Doctor care updates': 'डॉक्टरांनी दिलेली उपचार माहिती', 'Refresh updates': 'माहिती पुन्हा लोड करा', 'Loading doctor updates...': 'डॉक्टरांची माहिती लोड होत आहे...',
+    'No doctor care updates yet.': 'अद्याप डॉक्टरांकडून कोणतीही माहिती नाही.', 'Doctor care updates are available when you are online.': 'डॉक्टरांची माहिती पाहण्यासाठी इंटरनेटशी कनेक्ट करा.', 'Doctor care updates could not be loaded.': 'डॉक्टरांची माहिती लोड करता आली नाही.',
+    'Prescriptions': 'औषधांची चिठ्ठी', 'Consultation care plans': 'डॉक्टरांची उपचार योजना', 'Doctor referrals': 'डॉक्टरांचे संदर्भ', 'Assessment:': 'तपासणी:', 'Treatment plan:': 'उपचार योजना:',
+    'Dosage:': 'मात्रा:', 'Frequency:': 'किती वेळा:', 'Duration:': 'कालावधी:', 'Instructions:': 'सूचना:', 'Prescription notes:': 'औषधांबद्दल नोंद:', 'Referral reason:': 'संदर्भाचे कारण:', 'Status:': 'स्थिती:', 'No prescription items recorded.': 'औषधांचा तपशील नोंदवलेला नाही.',
     'Workspace navigation': 'कार्य क्षेत्र नेव्हिगेशन', 'Overview': 'आढावा', 'Patients': 'रुग्ण', 'Sync status': 'सिंक स्थिती',
     'Cases': 'प्रकरणे', 'Review conflicts': 'विसंगतींचे पुनरावलोकन', 'User management': 'वापरकर्ता व्यवस्थापन', 'Audit log': 'ऑडिट नोंद',
     'Choose language': 'भाषा निवडा', 'Language': 'भाषा',

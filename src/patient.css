@@ -18,6 +18,17 @@
 .metric-item[href]:hover { background: #edf3e8; }
 .sync-metric strong { color: var(--muted); }
 .asha-queue-section { margin-top: 34px; }
+.doctor-care-updates .asha-page-heading { align-items: center; }
+.doctor-care-updates .asha-page-heading h2 { margin: 8px 0 0; font-family: Georgia, serif; font-size: 28px; font-weight: 500; }
+.doctor-care-card { display: grid; gap: 11px; margin-bottom: 10px; padding: 16px; border: 1px solid var(--line); border-radius: 5px; background: #fffefa; }
+.doctor-care-card-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.doctor-care-card-heading > div { min-width: 0; }
+.doctor-care-card-heading strong { font-size: 13px; overflow-wrap: anywhere; }
+.doctor-care-card-heading p { margin: 4px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.doctor-care-card-heading > span { flex: 0 0 auto; padding: 5px 8px; border-radius: 999px; color: var(--green); background: #e9efe6; font-size: 10px; font-weight: 800; }
+.doctor-care-medicines { display: grid; gap: 7px; margin: 0; padding-left: 18px; color: #405347; font-size: 12px; line-height: 1.55; }
+.doctor-care-copy { margin: 0; color: #405347; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }
+.doctor-care-card .asha-secondary-action { justify-self: start; min-height: 34px; padding: 7px 9px; }
 .asha-queue-section .asha-page-heading { margin-bottom: 12px; }
 .asha-queue-section .asha-page-heading h2 { margin: 8px 0 0; font-family: Georgia, serif; font-size: 28px; font-weight: 500; }
 .asha-patient-list { border-top: 1px solid var(--line); }
@@ -119,6 +130,8 @@
 }
 
 @media (max-width: 600px) {
+  .doctor-care-updates .asha-page-heading { align-items: flex-start; }
+  .doctor-care-card-heading { flex-direction: column; }
   .asha-dashboard { padding-top: 34px; }
   .asha-page-heading { align-items: start; flex-direction: column; gap: 15px; }
   .asha-page-heading h1 { font-size: 39px; }

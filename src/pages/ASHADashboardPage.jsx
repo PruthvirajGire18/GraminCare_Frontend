@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSyncStatus } from '../hooks/useSyncStatus.js'
-import { getAshaDashboard, getAshaReferralQr } from '../services/asha.service.js'
+import { getAshaDashboard, getAshaDoctorCareUpdates, getAshaReferralQr } from '../services/asha.service.js'
 import { createReferralQrDataUrl } from '../utils/referralQr.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
@@ -36,6 +36,10 @@ function ASHADashboardPage() {
   const [qrReferral, setQrReferral] = useState(null)
   const [qrLoadingId, setQrLoadingId] = useState('')
   const [qrError, setQrError] = useState('')
+  const [doctorCare, setDoctorCare] = useState({ consultations: [], prescriptions: [], referrals: [] })
+  const [doctorCareLoading, setDoctorCareLoading] = useState(true)
+  const [doctorCareError, setDoctorCareError] = useState('')
+  const [doctorCareRefreshKey, setDoctorCareRefreshKey] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -47,6 +51,37 @@ function ASHADashboardPage() {
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [])
+
+  useEffect(() => {
+    let active = true
+    async function loadDoctorCare() {
+      setDoctorCareLoading(true)
+      setDoctorCareError('')
+      if (!navigator.onLine) {
+        setDoctorCareError('Doctor care updates are available when you are online.')
+        setDoctorCareLoading(false)
+        return
+      }
+      try {
+        const result = await getAshaDoctorCareUpdates()
+        if (active) setDoctorCare({
+          consultations: result.consultations || [],
+          prescriptions: result.prescriptions || [],
+          referrals: result.referrals || [],
+        })
+      } catch (requestError) {
+        if (active) setDoctorCareError(requestError.response?.data?.message || 'Doctor care updates could not be loaded.')
+      } finally {
+        if (active) setDoctorCareLoading(false)
+      }
+    }
+    void loadDoctorCare()
+    window.addEventListener('online', loadDoctorCare)
+    return () => {
+      active = false
+      window.removeEventListener('online', loadDoctorCare)
+    }
+  }, [doctorCareRefreshKey])
 
   async function showReferralQr(referralId) {
     setQrLoadingId(referralId)
@@ -112,6 +147,41 @@ function ASHADashboardPage() {
         </article>)}</div>
         {qrError && <p className="auth-error" role="alert">{translateError(qrError)}</p>}
       </section>}
+
+      <section className="asha-queue-section doctor-care-updates" aria-labelledby="asha-doctor-care-heading">
+        <div className="asha-page-heading">
+          <div><p className="eyebrow"><span className="eyebrow-dot" /> {t('Care coordination')}</p><h2 id="asha-doctor-care-heading">{t('Doctor care updates')}</h2></div>
+          <button className="asha-secondary-action" type="button" disabled={doctorCareLoading} onClick={() => setDoctorCareRefreshKey((current) => current + 1)}>{doctorCareLoading ? t('Loading doctor updates...') : t('Refresh updates')}</button>
+        </div>
+        {doctorCareError && <p className="auth-error" role="alert">{translateError(doctorCareError)}</p>}
+        {doctorCareLoading ? <p className="patient-state" role="status">{t('Loading doctor updates...')}</p> : (
+          <>
+            {doctorCare.prescriptions.map((prescription) => <article className="doctor-care-card" key={`prescription-${prescription.id}`}>
+              <div className="doctor-care-card-heading"><div><strong>{prescription.patientName}</strong><p>{t('Doctor')}: {prescription.doctorName} · {formatDateTime(prescription.createdAt)}</p></div><span>{t('Prescriptions')}</span></div>
+              {prescription.items.length ? <ul className="doctor-care-medicines">{prescription.items.map((medicine, index) => <li key={`${prescription.id}-${index}`}>
+                <strong>{medicine.medicine}</strong> · {t('Dosage:')} {medicine.dosage} · {t('Frequency:')} {medicine.frequency}{medicine.duration ? ` · ${t('Duration:')} ${medicine.duration}` : ''}{medicine.instructions ? ` · ${t('Instructions:')} ${medicine.instructions}` : ''}
+              </li>)}</ul> : <p className="doctor-care-copy">{t('No prescription items recorded.')}</p>}
+              {prescription.notes && <p className="doctor-care-copy"><strong>{t('Prescription notes:')}</strong> {prescription.notes}</p>}
+              <Link className="asha-secondary-action" to={`/asha/patients/${prescription.patientId}`}>{t('Open patient')} <span aria-hidden="true">→</span></Link>
+            </article>)}
+            {doctorCare.consultations.map((consultation) => <article className="doctor-care-card" key={`consultation-${consultation.id}`}>
+              <div className="doctor-care-card-heading"><div><strong>{consultation.patientName}</strong><p>{t('Doctor')}: {consultation.doctorName} · {formatDateTime(consultation.createdAt)}</p></div><span>{t('Consultation care plans')} · {t(consultation.priority)}</span></div>
+              {consultation.assessment && <p className="doctor-care-copy"><strong>{t('Assessment:')}</strong> {consultation.assessment}</p>}
+              {consultation.treatmentPlan && <p className="doctor-care-copy"><strong>{t('Treatment plan:')}</strong> {consultation.treatmentPlan}</p>}
+              {consultation.followUpDate && <p className="doctor-care-copy"><strong>{t('Follow-up')}:</strong> {formatDate(consultation.followUpDate)}{consultation.followUpStatus ? ` · ${t(consultation.followUpStatus)}` : ''}</p>}
+              <Link className="asha-secondary-action" to={`/asha/patients/${consultation.patientId}`}>{t('Open patient')} <span aria-hidden="true">→</span></Link>
+            </article>)}
+            {doctorCare.referrals.map((referral) => <article className="doctor-care-card" key={`doctor-referral-${referral.id}`}>
+              <div className="doctor-care-card-heading"><div><strong>{referral.patientName}</strong><p>{t('Doctor')}: {referral.doctorName} · {formatDateTime(referral.createdAt)}</p></div><span>{t(referral.status)} · {t(referral.priority)}</span></div>
+              <p className="doctor-care-copy"><strong>{t('Referral reason:')}</strong> {referral.reason}</p>
+              {referral.destination?.facilityName && <p className="doctor-care-copy"><strong>{t('Destination:')}</strong> {referral.destination.facilityName}{referral.destination.address ? ` · ${referral.destination.address}` : ''}</p>}
+              <p className="doctor-care-copy"><strong>{t('Expires')}:</strong> {formatDate(referral.expiresAt)}</p>
+              <Link className="asha-secondary-action" to={`/asha/patients/${referral.patientId}`}>{t('Open patient')} <span aria-hidden="true">→</span></Link>
+            </article>)}
+            {!doctorCare.prescriptions.length && !doctorCare.consultations.length && !doctorCare.referrals.length && !doctorCareError && <p className="patient-state">{t('No doctor care updates yet.')}</p>}
+          </>
+        )}
+      </section>
 
       {(summary?.doctorFollowUps?.length > 0 || summary?.followUpVisits?.length > 0) && <section className="asha-queue-section" aria-labelledby="asha-follow-ups-heading">
         <div className="asha-page-heading"><div><p className="eyebrow"><span className="eyebrow-dot" /> {t('Care coordination')}</p><h2 id="asha-follow-ups-heading">{t('Follow-up due')}</h2></div></div>

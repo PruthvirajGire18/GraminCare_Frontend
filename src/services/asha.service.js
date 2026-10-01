@@ -82,6 +82,11 @@ export async function getAshaDashboard() {
   return { ...localCounts, referrals: 0, syncEnabled: true }
 }
 
+export async function getAshaDoctorCareUpdates() {
+  const { data } = await api.get('/asha/doctor-care-updates')
+  return data
+}
+
 async function getPendingDashboardChanges(workerId) {
   const [patients, visits] = await Promise.all([
     getLocalPatients(workerId),

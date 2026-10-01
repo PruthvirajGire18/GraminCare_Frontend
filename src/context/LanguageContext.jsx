@@ -6,6 +6,8 @@ const LOCALES = { en: 'en-IN', hi: 'hi-IN', mr: 'mr-IN' }
 
 const translations = {
   hi: {
+    'Workspace navigation': 'कार्य क्षेत्र नेविगेशन', 'Overview': 'अवलोकन', 'Patients': 'मरीज़', 'Sync status': 'सिंक स्थिति',
+    'Cases': 'मामले', 'Review conflicts': 'टकराव की समीक्षा', 'User management': 'उपयोगकर्ता प्रबंधन', 'Audit log': 'ऑडिट लॉग',
     'Choose language': 'भाषा चुनें',
     'Language': 'भाषा',
     'Sign out': 'साइन आउट', 'Sign in': 'साइन इन', 'Request access': 'प्रवेश का अनुरोध करें',
@@ -102,6 +104,8 @@ const translations = {
     ' is too long': ' बहुत लंबा है', ' must be between ': ' का मान होना चाहिए: ',
   },
   mr: {
+    'Workspace navigation': 'कार्य क्षेत्र नेव्हिगेशन', 'Overview': 'आढावा', 'Patients': 'रुग्ण', 'Sync status': 'सिंक स्थिती',
+    'Cases': 'प्रकरणे', 'Review conflicts': 'विसंगतींचे पुनरावलोकन', 'User management': 'वापरकर्ता व्यवस्थापन', 'Audit log': 'ऑडिट नोंद',
     'Choose language': 'भाषा निवडा', 'Language': 'भाषा',
     'Sign out': 'साइन आउट', 'Sign in': 'साइन इन', 'Request access': 'प्रवेशासाठी विनंती करा',
     'ASHA Worker': 'आशा कार्यकर्ता', 'Doctor': 'डॉक्टर', 'Admin': 'प्रशासक',

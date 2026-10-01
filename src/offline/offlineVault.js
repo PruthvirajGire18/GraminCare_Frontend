@@ -3,14 +3,24 @@ import {
   createOfflineVault,
   decryptVaultValue,
   deriveOfflineKey,
+  hasLegacyOfflinePatch,
   hasUnlockedOfflineVault,
   lockOfflineVault,
+  stripLegacyOfflinePatchMarker,
   verifyAndUnlockVault,
 } from './offlineVaultCrypto.js'
 
 const PROTECTED_TABLES = ['patients', 'visits', 'syncQueue', 'syncHistory', 'session']
-const VERIFIER_VERSION = 1
+const OFFLINE_DATA_VERSION = 2
 const encoder = new TextEncoder()
+
+function sessionVaultOwner(row) {
+  return /^(?:doctor-follow-ups|dashboard):([^:]+)(?::|$)/.exec(row?.key || '')?.[1] || null
+}
+
+function isVaultSessionRow(row) {
+  return /^(?:doctor-follow-ups|dashboard):/.test(row?.key || '')
+}
 
 export function isOfflineVaultUnlocked(userId) {
   return hasUnlockedOfflineVault(userId)
@@ -21,29 +31,45 @@ export function lockOfflineData() {
 }
 
 async function migrateLegacyRows(userId, vault) {
-  if (vault.dataVersion >= VERIFIER_VERSION) return
+  if (vault.dataVersion >= OFFLINE_DATA_VERSION) return
   let otherAccountPlaintextExists = false
   for (const tableName of PROTECTED_TABLES) {
     const table = offlineDb.table(tableName)
     const rows = await table.toArray()
     const protectedRows = rows.filter((row) => (
-      tableName !== 'session' || row.key.startsWith('doctor-follow-ups:')
+      tableName !== 'session' || isVaultSessionRow(row)
     ))
     for (const row of protectedRows) {
-      const rowOwner = row.workerId || (tableName === 'session' ? /^doctor-follow-ups:([^:]+):/.exec(row.key || '')?.[1] : null)
+      const rowOwner = row.workerId || (tableName === 'session' ? sessionVaultOwner(row) : null)
       if (rowOwner !== userId && !row.__fieldsyncEncrypted) otherAccountPlaintextExists = true
     }
     const ownedRows = rows.filter((row) => (
-      (row.workerId || (tableName === 'session' ? /^doctor-follow-ups:([^:]+):/.exec(row.key || '')?.[1] : null)) === userId
+      (row.workerId || (tableName === 'session' ? sessionVaultOwner(row) : null)) === userId
       && !row.__fieldsyncEncrypted
-      && (tableName !== 'session' || row.key.startsWith('doctor-follow-ups:'))
+      && (tableName !== 'session' || isVaultSessionRow(row))
     ))
     if (ownedRows.length) await table.bulkPut(ownedRows)
+    const rowsToUpgrade = rows.filter((row) => (
+      (row.workerId || (tableName === 'session' ? sessionVaultOwner(row) : null)) === userId
+      && (
+        hasLegacyOfflinePatch(row)
+        || (tableName === 'syncQueue' && row.attemptedAt === undefined)
+      )
+    ))
+    for (const row of rowsToUpgrade) {
+      const upgraded = stripLegacyOfflinePatchMarker(row)
+      if (tableName === 'syncQueue' && upgraded.attemptedAt === undefined) {
+        // Older rows may already have reached the server before their response
+        // was lost. Keep their payload and operation ID immutable on retry.
+        upgraded.attemptedAt = upgraded.createdAt || new Date().toISOString()
+      }
+      await table.put(upgraded)
+    }
   }
   if (otherAccountPlaintextExists) {
     throw new Error('Legacy offline records for another or unidentified ASHA account are still unencrypted. Sign in online with each account on this device to migrate them.')
   }
-  await offlineDb.vaults.update(userId, { dataVersion: VERIFIER_VERSION, migratedAt: new Date().toISOString() })
+  await offlineDb.vaults.update(userId, { dataVersion: OFFLINE_DATA_VERSION, migratedAt: new Date().toISOString() })
 }
 
 export async function initializeOrUnlockOfflineVault(user, password) {

@@ -1,6 +1,8 @@
-.header-actions { display: flex; align-items: center; gap: 16px; }
-.header-login, .header-dashboard { color: var(--green); font-size: 13px; font-weight: 700; text-decoration: none; }
-.header-register, .header-logout { padding: 9px 12px; border: 1px solid var(--green); border-radius: 4px; color: var(--green); background: transparent; font-size: 12px; font-weight: 700; text-decoration: none; cursor: pointer; }
+.header-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 16px; }
+.language-picker { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.language-picker select { max-width: 112px; min-height: 38px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 4px; color: var(--green); background: #fff; font: inherit; font-size: 12px; cursor: pointer; }
+.header-login, .header-dashboard { display: inline-flex; min-height: 40px; align-items: center; color: var(--green); font-size: 13px; font-weight: 700; text-decoration: none; }
+.header-register, .header-logout { min-height: 40px; padding: 9px 12px; border: 1px solid var(--green); border-radius: 4px; color: var(--green); background: transparent; font-size: 12px; font-weight: 700; text-decoration: none; cursor: pointer; }
 .header-logout { padding: 8px 10px; }
 .auth-page { display: grid; min-height: 68vh; place-items: center; padding-block: 48px 68px; }
 .auth-panel { width: min(100%, 500px); padding: clamp(24px, 5vw, 42px); border: 1px solid var(--line); background: #fff; }
@@ -46,6 +48,8 @@
   .site-header { flex-wrap: wrap; gap: 9px; padding-block: 12px; }
   .header-note { display: none; }
   .header-actions { gap: 9px; }
+  .language-picker { gap: 4px; }
+  .language-picker select { max-width: 94px; }
   .header-register, .header-logout { padding: 7px 9px; }
   .auth-page { min-height: auto; padding-block: 40px 60px; }
   .auth-panel h1 { font-size: 36px; }

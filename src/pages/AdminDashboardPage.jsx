@@ -1,88 +1,77 @@
-import { useEffect, useState } from 'react'
-import { useAuth } from '../hooks/useAuth.js'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { approveUser, getUsers, rejectUser, setUserStatus } from '../services/admin.service.js'
+import AdminAuditPanel from '../components/AdminAuditPanel.jsx'
+import AdminOverview from '../components/AdminOverview.jsx'
+import AdminUsersPanel from '../components/AdminUsersPanel.jsx'
+import { useAuth } from '../hooks/useAuth.js'
+import { getAdminAnalytics } from '../services/admin.service.js'
+import '../admin.css'
 
 function AdminDashboardPage() {
   const { user } = useAuth()
-  const [users, setUsers] = useState([])
+  const [analytics, setAnalytics] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
-  const [pendingId, setPendingId] = useState('')
-  const [reloadKey, setReloadKey] = useState(0)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  const loadAnalytics = useCallback(async () => {
+    setRefreshing(true)
+    setError('')
+    try {
+      setAnalytics(await getAdminAnalytics())
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || 'Unable to load dashboard analytics.')
+    } finally {
+      setRefreshing(false)
+    }
+  }, [])
 
   useEffect(() => {
     let active = true
-    getUsers()
-      .then((result) => { if (active) setUsers(result) })
+    getAdminAnalytics()
+      .then((result) => { if (active) setAnalytics(result) })
       .catch((requestError) => {
-        if (active) setError(requestError.response?.data?.message || 'Unable to load accounts.')
+        if (active) setError(requestError.response?.data?.message || 'Unable to load dashboard analytics.')
       })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [reloadKey])
+  }, [])
 
-  async function runAction(targetUser, action) {
-    setPendingId(targetUser.id)
-    setError('')
-    try {
-      if (action === 'approve') await approveUser(targetUser.id)
-      if (action === 'reject') await rejectUser(targetUser.id)
-      if (action === 'status') {
-        const status = targetUser.status === 'INACTIVE' ? 'APPROVED' : 'INACTIVE'
-        await setUserStatus(targetUser.id, status)
-      }
-      setReloadKey((current) => current + 1)
-    } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Unable to update this account.')
-    } finally {
-      setPendingId('')
-    }
+  function handleUsersChanged() {
+    setRefreshKey((current) => current + 1)
+    void loadAnalytics()
   }
 
   return (
     <main className="content-width dashboard-page admin-page">
-      <p className="eyebrow"><span className="eyebrow-dot" /> Administrator workspace</p>
-      <div className="dashboard-heading">
+      <p className="eyebrow"><span className="eyebrow-dot" /> FieldSync administration</p>
+      <div className="admin-page-heading">
         <div>
-          <h1>Account approvals</h1>
-          <p>Review registrations and manage account access.</p>
+          <h1>System overview</h1>
+          <p>Monitor care operations, manage access, and review system activity.</p>
         </div>
-        <span className="admin-identity">Signed in as {user.name}</span>
+        <div className="admin-heading-actions">
+          <span className="admin-identity">Signed in as {user?.name || 'Administrator'}</span>
+          <button className="admin-refresh" type="button" disabled={refreshing} onClick={() => { void loadAnalytics(); setRefreshKey((current) => current + 1) }}>
+            {refreshing ? 'Refreshing…' : 'Refresh data'}
+          </button>
+        </div>
       </div>
-      <p><Link className="asha-secondary-action" to="/admin/conflicts">Review clinical data conflicts</Link></p>
-      {error && <p className="auth-error" role="alert">{error}</p>}
-      {loading ? <p className="dashboard-message" role="status">Loading accounts...</p> : (
-        <div className="user-table-wrap">
-          <table className="user-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody>
-              {users.map((account) => (
-                <tr key={account.id}>
-                  <td>{account.name}</td>
-                  <td>{account.email}</td>
-                  <td>{account.role.replace('_', ' ')}</td>
-                  <td><span className={`status-label status-${account.status.toLowerCase()}`}>{account.status}</span></td>
-                  <td className="user-actions">
-                    {account.role !== 'ADMIN' && account.status === 'PENDING' && (
-                      <>
-                        <button type="button" onClick={() => runAction(account, 'approve')} disabled={pendingId === account.id}>Approve</button>
-                        <button type="button" className="text-action" onClick={() => runAction(account, 'reject')} disabled={pendingId === account.id}>Reject</button>
-                      </>
-                    )}
-                    {account.role !== 'ADMIN' && ['APPROVED', 'INACTIVE'].includes(account.status) && (
-                      <button type="button" className="text-action" onClick={() => runAction(account, 'status')} disabled={pendingId === account.id}>
-                        {account.status === 'INACTIVE' ? 'Reactivate' : 'Deactivate'}
-                      </button>
-                    )}
-                    {account.role === 'ADMIN' && <span className="muted-action">Administrator</span>}
-                  </td>
-                </tr>
-              ))}
-              {!users.length && <tr><td colSpan="5">No accounts have registered yet.</td></tr>}
-            </tbody>
-          </table>
-        </div>
+
+      <nav className="admin-jump-links" aria-label="Admin dashboard sections">
+        <a href="#admin-users-title">User management</a>
+        <a href="#admin-audit-title">Audit log</a>
+        <Link to="/admin/conflicts">Review clinical data conflicts</Link>
+      </nav>
+
+      {error && <p className="admin-error" role="alert">{error}</p>}
+      {loading && !analytics ? <p className="admin-state admin-loading" role="status">Loading FieldSync overview…</p> : (
+        <>
+          {analytics && <AdminOverview analytics={analytics} />}
+          <AdminUsersPanel onUsersChanged={handleUsersChanged} />
+          <AdminAuditPanel refreshKey={refreshKey} />
+        </>
       )}
     </main>
   )

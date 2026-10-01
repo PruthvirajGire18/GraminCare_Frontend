@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getPatient, updatePatientVisit } from '../services/asha.service.js'
+import { useLanguage } from '../context/LanguageContext.jsx'
 
 const VITAL_FIELDS = [
   ['temperatureC', 'Temperature (°C)', 25, 45, '0.1'],
@@ -14,6 +15,7 @@ const VITAL_FIELDS = [
 ]
 
 function PatientVisitEditPage() {
+  const { t, translateError } = useLanguage()
   const { patientId, visitId } = useParams()
   const navigate = useNavigate()
   const [patient, setPatient] = useState(null)
@@ -85,36 +87,36 @@ function PatientVisitEditPage() {
     }
   }
 
-  if (loading) return <main className="content-width asha-dashboard patient-form-page"><p className="patient-state" role="status">Loading visit...</p></main>
-  if (!form || !patient) return <main className="content-width asha-dashboard patient-form-page"><p className="auth-error" role="alert">{error || 'Visit not found.'}</p><Link className="back-link" to={`/asha/patients/${patientId}`}>Back to patient</Link></main>
+  if (loading) return <main className="content-width asha-dashboard patient-form-page"><p className="patient-state" role="status">{t('Loading visit...')}</p></main>
+  if (!form || !patient) return <main className="content-width asha-dashboard patient-form-page"><p className="auth-error" role="alert">{translateError(error || 'Visit not found.')}</p><Link className="back-link" to={`/asha/patients/${patientId}`}>{t('Back to patient')}</Link></main>
 
   return (
     <main className="content-width asha-dashboard patient-form-page">
-      <Link className="back-link" to={`/asha/patients/${patientId}`}>&#8592; Back to {patient.fullName}</Link>
+      <Link className="back-link" to={`/asha/patients/${patientId}`}>&#8592; {t('Back to patient')}</Link>
       <section className="patient-form-panel visit-form-panel">
-        <p className="eyebrow"><span className="eyebrow-dot" /> Version {visit.version} · ASHA visit</p>
-        <h1>Edit field observations</h1>
-        <p className="form-intro">Your original version is attached to this update. If another worker changed the same field, both values will be preserved for review.</p>
+        <p className="eyebrow"><span className="eyebrow-dot" /> {t('Version')} {visit.version} · {t('ASHA visit')}</p>
+        <h1>{t('Edit field observations')}</h1>
+        <p className="form-intro">{t('Your original version is attached to this update. If another worker changed the same field, both values will be preserved for review.')}</p>
         <form className="patient-form" onSubmit={saveVisit}>
-          <label htmlFor="edit-chief-complaint">Symptoms / chief complaint</label>
+          <label htmlFor="edit-chief-complaint">{t('Symptoms / chief complaint')}</label>
           <input id="edit-chief-complaint" required minLength="2" maxLength="1000" value={form.chiefComplaint} onChange={(event) => setField('chiefComplaint', event.target.value)} />
-          <label htmlFor="edit-symptom-details">Symptom details</label>
+          <label htmlFor="edit-symptom-details">{t('Symptom details')}</label>
           <textarea id="edit-symptom-details" rows="3" maxLength="4000" value={form.symptomDetails} onChange={(event) => setField('symptomDetails', event.target.value)} />
-          <label htmlFor="edit-symptom-duration">Symptom duration <span className="field-hint">Days, optional</span></label>
+          <label htmlFor="edit-symptom-duration">{t('Symptom duration')} <span className="field-hint">{t('Days, optional')}</span></label>
           <input id="edit-symptom-duration" type="number" min="0" max="365" step="1" value={form.symptomDurationDays} onChange={(event) => setField('symptomDurationDays', event.target.value)} />
-          <label htmlFor="edit-medical-history">Medical history <span className="field-hint">One item per line</span></label>
+          <label htmlFor="edit-medical-history">{t('Medical history')} <span className="field-hint">{t('One item per line')}</span></label>
           <textarea id="edit-medical-history" rows="2" value={form.medicalHistory} onChange={(event) => setField('medicalHistory', event.target.value)} />
           <div className="form-grid-two">
-            <div><label htmlFor="edit-allergies">Allergies <span className="field-hint">One per line</span></label><textarea id="edit-allergies" rows="3" value={form.allergies} onChange={(event) => setField('allergies', event.target.value)} /></div>
-            <div><label htmlFor="edit-medicines">Current medicines <span className="field-hint">One per line</span></label><textarea id="edit-medicines" rows="3" value={form.currentMedicines} onChange={(event) => setField('currentMedicines', event.target.value)} /></div>
+            <div><label htmlFor="edit-allergies">{t('Allergies')} <span className="field-hint">{t('One per line')}</span></label><textarea id="edit-allergies" rows="3" value={form.allergies} onChange={(event) => setField('allergies', event.target.value)} /></div>
+            <div><label htmlFor="edit-medicines">{t('Current medicines')} <span className="field-hint">{t('One per line')}</span></label><textarea id="edit-medicines" rows="3" value={form.currentMedicines} onChange={(event) => setField('currentMedicines', event.target.value)} /></div>
           </div>
-          <fieldset className="vitals-fieldset"><legend>Vitals</legend><div className="vitals-grid">
-            {VITAL_FIELDS.map(([field, label, min, max, step]) => <div key={field}><label htmlFor={`edit-${field}`}>{label}</label><input id={`edit-${field}`} type="number" min={min} max={max} step={step} value={form.vitals[field]} onChange={(event) => setVital(field, event.target.value)} /></div>)}
+          <fieldset className="vitals-fieldset"><legend>{t('Vitals')}</legend><div className="vitals-grid">
+            {VITAL_FIELDS.map(([field, label, min, max, step]) => <div key={field}><label htmlFor={`edit-${field}`}>{t(label)}</label><input id={`edit-${field}`} type="number" min={min} max={max} step={step} value={form.vitals[field]} onChange={(event) => setVital(field, event.target.value)} /></div>)}
           </div></fieldset>
-          <label htmlFor="edit-observations">Observations</label>
+          <label htmlFor="edit-observations">{t('Observations')}</label>
           <textarea id="edit-observations" rows="3" maxLength="4000" value={form.observations} onChange={(event) => setField('observations', event.target.value)} />
-          {error && <p className="auth-error" role="alert">{error}</p>}
-          <button className="auth-submit" type="submit" disabled={saving}>{saving ? 'Saving update...' : 'Save field updates'}</button>
+          {error && <p className="auth-error" role="alert">{translateError(error)}</p>}
+          <button className="auth-submit" type="submit" disabled={saving}>{saving ? t('Saving update...') : t('Save field updates')}</button>
         </form>
       </section>
     </main>

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createReferralQrDataUrl } from './referralQr.js'
 
-test('referral verification link generates a scannable QR image', async () => {
+test('doctor dashboard referral link generates a scannable QR image', async () => {
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
@@ -10,7 +10,7 @@ test('referral verification link generates a scannable QR image', async () => {
   })
   try {
     const token = `REF-${'a'.repeat(64)}`
-    const qr = await createReferralQrDataUrl(`/referral/verify#${token}`)
+    const qr = await createReferralQrDataUrl(`/doctor#${token}`)
     assert.match(qr, /^data:image\/png;base64,/)
     assert.ok(qr.length > 1000)
   } finally {
@@ -19,7 +19,7 @@ test('referral verification link generates a scannable QR image', async () => {
   }
 })
 
-test('QR helper rejects links outside the same-origin referral verification route', async () => {
+test('QR helper rejects links outside the same-origin referral routes', async () => {
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
   Object.defineProperty(globalThis, 'window', {
     configurable: true,

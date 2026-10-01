@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.js'
 import { dashboardPathForRole } from '../utils/auth.js'
 
 function LoginPage() {
   const { user, loading: sessionLoading, login } = useAuth()
   const navigate = useNavigate()
+  const routeLocation = useLocation()
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -20,7 +21,11 @@ function LoginPage() {
     setSubmitting(true)
     try {
       const signedInUser = await login(form)
-      navigate(dashboardPathForRole(signedInUser.role), { replace: true })
+      const requestedPath = routeLocation.state?.from
+      const destination = requestedPath?.pathname?.startsWith('/') && !requestedPath.pathname.startsWith('//')
+        ? `${requestedPath.pathname}${requestedPath.search || ''}${requestedPath.hash || ''}`
+        : dashboardPathForRole(signedInUser.role)
+      navigate(destination, { replace: true })
     } catch (requestError) {
       const response = requestError.response?.data
       setError(response?.message || 'Unable to sign in. Check your connection and try again.')

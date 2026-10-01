@@ -1,6 +1,44 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getDoctorDashboard } from '../services/doctor.service.js'
+import { getDoctorCaseByReferralQr, getDoctorDashboard } from '../services/doctor.service.js'
+
+const REFERRAL_TOKEN_PATTERN = /^REF-[a-f\d]{64}$/i
+
+function extractReferralToken(value) {
+  const input = typeof value === 'string' ? value.trim() : ''
+  if (REFERRAL_TOKEN_PATTERN.test(input)) return input
+  if (!input) return ''
+
+  try {
+    const link = new URL(input, window.location.origin)
+    if (
+      link.origin !== window.location.origin
+      || !['/doctor', '/referral/verify'].includes(link.pathname)
+      || link.search
+      || !REFERRAL_TOKEN_PATTERN.test(link.hash.slice(1))
+    ) return ''
+    return link.hash.slice(1)
+  } catch {
+    return ''
+  }
+}
+
+function displayRecordList(values) {
+  return Array.isArray(values) && values.length ? values.join(', ') : 'Not recorded'
+}
+
+function vitalEntries(vitals = {}) {
+  const entries = [
+    ['Temperature', vitals.temperatureC, '°C'],
+    ['Heart rate', vitals.heartRateBpm, 'bpm'],
+    ['Respiratory rate', vitals.respiratoryRatePerMinute, '/min'],
+    ['Blood pressure', vitals.systolicMmHg && vitals.diastolicMmHg ? `${vitals.systolicMmHg}/${vitals.diastolicMmHg}` : null, 'mmHg'],
+    ['Oxygen saturation', vitals.oxygenSaturationPercent, '%'],
+    ['Weight', vitals.weightKg, 'kg'],
+    ['Height', vitals.heightCm, 'cm'],
+  ]
+  return entries.filter(([, value]) => value !== null && value !== undefined && value !== '').map(([label, value, unit]) => [label, `${value} ${unit}`])
+}
 
 const RISK_BADGES = {
   LOW: { icon: '🟢', label: 'LOW' },
@@ -66,6 +104,36 @@ function DoctorDashboardPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [updatedAt, setUpdatedAt] = useState(null)
+  const initialQrToken = useRef(extractReferralToken(`${window.location.pathname}${window.location.search}${window.location.hash}`))
+  const initialLookupStarted = useRef(false)
+  const [qrInput, setQrInput] = useState(initialQrToken.current)
+  const [qrCase, setQrCase] = useState(null)
+  const [qrLookupLoading, setQrLookupLoading] = useState(false)
+  const [qrError, setQrError] = useState('')
+
+  const lookupReferralToken = useCallback(async (token) => {
+    setQrLookupLoading(true)
+    setQrError('')
+    setQrCase(null)
+    try {
+      const patientCase = await getDoctorCaseByReferralQr(token)
+      setQrCase(patientCase)
+      setQrInput('')
+    } catch (requestError) {
+      setQrInput(token)
+      setQrError(requestError.response?.data?.message || 'Patient record could not be opened. Check that the referral QR is valid and unused.')
+    } finally {
+      setQrLookupLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!initialQrToken.current || initialLookupStarted.current) return
+    initialLookupStarted.current = true
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`)
+    setQrInput('')
+    void lookupReferralToken(initialQrToken.current)
+  }, [lookupReferralToken])
 
   const refresh = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true)
@@ -116,6 +184,17 @@ function DoctorDashboardPage() {
     setFilters(next)
   }
 
+  function submitQrLookup(event) {
+    event.preventDefault()
+    setQrError('')
+    const token = extractReferralToken(qrInput)
+    if (!token) {
+      setQrError('Enter a valid FieldSync referral code or QR link.')
+      return
+    }
+    void lookupReferralToken(token)
+  }
+
   return (
     <main className="content-width doctor-dashboard">
       <div className="asha-page-heading doctor-page-heading">
@@ -136,6 +215,38 @@ function DoctorDashboardPage() {
         <MetricCard label="High risk" value={summary.highRiskCases} className="metric-high" active={filters.riskLevel === 'HIGH'} onClick={() => selectPreset('highRiskCases')} />
         <MetricCard label="Critical" value={summary.criticalCases} className="metric-critical" active={filters.riskLevel === 'CRITICAL'} onClick={() => selectPreset('criticalCases')} />
         <MetricCard label="Follow-ups" value={summary.followUps} active={filters.followUpDue} onClick={() => selectPreset('followUps')} />
+      </section>
+
+      <section className="doctor-qr-lookup" aria-labelledby="doctor-qr-lookup-heading">
+        <div className="doctor-qr-lookup-heading">
+          <div><p className="eyebrow"><span className="eyebrow-dot" /> Referral QR</p><h2 id="doctor-qr-lookup-heading">Open a patient record</h2></div>
+          <span>Secure one-time access</span>
+        </div>
+        <p>Scan the referral QR while signed in to FieldSync, or paste its referral code or link below.</p>
+        <form className="doctor-qr-lookup-form" onSubmit={submitQrLookup}>
+          <label htmlFor="doctor-referral-qr">Referral code or scanned QR link</label>
+          <div><input id="doctor-referral-qr" autoComplete="off" maxLength="600" value={qrInput} onChange={(event) => setQrInput(event.target.value)} placeholder="REF-… or paste the QR link" /><button className="doctor-primary-button" type="submit" disabled={qrLookupLoading}>{qrLookupLoading ? 'Opening record…' : 'Find patient'}</button></div>
+        </form>
+        <small className="doctor-qr-lookup-note">The token expires after 7 days and can be used once. Patient notes and symptoms stay in the language they were entered.</small>
+        {qrError && <p className="auth-error" role="alert">{qrError}</p>}
+        {qrCase && <article className="doctor-qr-patient-card" aria-live="polite">
+          <div className="doctor-qr-patient-heading">
+            <div><p className="eyebrow"><span className="eyebrow-dot" /> Referral opened</p><h3>{qrCase.patient.fullName}</h3><p>{qrCase.patient.ageYears === null ? 'Age not recorded' : `${qrCase.patient.ageYears} years`} · {qrCase.patient.gender.toLowerCase()} · {qrCase.patient.phone || 'Phone not recorded'}</p></div>
+            <span>{qrCase.visits.length} field visit{qrCase.visits.length === 1 ? '' : 's'}</span>
+          </div>
+          <div className="doctor-qr-record-grid">
+            <section><h4>Medical history</h4><p>{displayRecordList(qrCase.medicalHistory)}</p></section>
+            <section><h4>Allergies</h4><p>{displayRecordList(qrCase.allergies)}</p></section>
+            <section><h4>Current medicines</h4><p>{displayRecordList(qrCase.currentMedicines)}</p></section>
+          </div>
+          {qrCase.visits[0] && <section className="doctor-qr-latest-visit">
+            <h4>Latest ASHA visit · {formatDate(qrCase.visits[0].visitDate)}</h4>
+            <p><strong>Symptoms:</strong> {qrCase.visits[0].symptoms?.chiefComplaint || 'Not recorded'}{qrCase.visits[0].symptoms?.details ? ` · ${qrCase.visits[0].symptoms.details}` : ''}</p>
+            {vitalEntries(qrCase.visits[0].vitals).length > 0 && <dl>{vitalEntries(qrCase.visits[0].vitals).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
+            {qrCase.visits[0].observations && <p><strong>Observations:</strong> {qrCase.visits[0].observations}</p>}
+          </section>}
+          <div className="doctor-qr-record-footer"><span>{qrCase.consultations.length} consultation{qrCase.consultations.length === 1 ? '' : 's'} · {qrCase.prescriptions.length} prescription{qrCase.prescriptions.length === 1 ? '' : 's'} · {qrCase.referrals.length} referral{qrCase.referrals.length === 1 ? '' : 's'}</span><Link className="doctor-open-case" to={`/doctor/cases/${qrCase.patient.id}`}>Open complete patient case <span aria-hidden="true">→</span></Link></div>
+        </article>}
       </section>
 
       <div className="doctor-dashboard-links">

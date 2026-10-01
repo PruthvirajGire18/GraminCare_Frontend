@@ -7,7 +7,7 @@ export async function createReferralQrDataUrl(verificationUrl) {
   }
   if (
     link.origin !== window.location.origin
-    || link.pathname !== '/referral/verify'
+    || !['/doctor', '/referral/verify'].includes(link.pathname)
     || link.search
     || !/^#REF-[a-f\d]{64}$/i.test(link.hash)
   ) {

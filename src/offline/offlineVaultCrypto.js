@@ -1,6 +1,7 @@
 const KDF_ITERATIONS = 600_000
 const VAULT_FORMAT_VERSION = 1
 const ENCRYPTED_FIELD = '__fieldsyncEncrypted'
+const LEGACY_PATCH_FIELDS = '__fieldsyncLegacyPatchFields'
 const TEXT_ENCODER = new TextEncoder()
 const TEXT_DECODER = new TextDecoder()
 
@@ -34,7 +35,7 @@ function randomBytes(length) {
 function protectedMetadata(tableName, record) {
   const fields = PROTECTED_TABLES[tableName]
   if (fields) return fields
-  if (tableName === 'session' && typeof record?.key === 'string' && record.key.startsWith('doctor-follow-ups:')) {
+  if (tableName === 'session' && typeof record?.key === 'string' && /^(doctor-follow-ups|dashboard):/.test(record.key)) {
     return ['key', 'workerId']
   }
   return null
@@ -42,7 +43,7 @@ function protectedMetadata(tableName, record) {
 
 function sessionWorkerId(record) {
   if (record?.workerId) return record.workerId
-  const match = /^doctor-follow-ups:([^:]+):/.exec(record?.key || '')
+  const match = /^(?:doctor-follow-ups|dashboard):([^:]+)(?::|$)/.exec(record?.key || '')
   return match?.[1] || null
 }
 
@@ -177,7 +178,21 @@ export async function decryptOfflineRecord(tableName, record) {
   if (envelope.version !== VAULT_FORMAT_VERSION) throw new Error('Unsupported encrypted offline record version')
   const key = requireActiveKey(workerId)
   const payload = await decryptVaultValue(key, envelope, associatedData(tableName, workerId, record))
-  return { ...metadataOnly(tableName, record), ...payload, [ENCRYPTED_FIELD]: true }
+  const metadata = new Set([...metadataFields, ENCRYPTED_FIELD])
+  const legacyPatch = Object.fromEntries(Object.entries(record).filter(([field]) => !metadata.has(field)))
+  const restored = { ...metadataOnly(tableName, record), ...payload, ...legacyPatch, [ENCRYPTED_FIELD]: true }
+  if (Object.keys(legacyPatch).length) restored[LEGACY_PATCH_FIELDS] = Object.keys(legacyPatch)
+  return restored
+}
+
+export function hasLegacyOfflinePatch(record) {
+  return Array.isArray(record?.[LEGACY_PATCH_FIELDS]) && record[LEGACY_PATCH_FIELDS].length > 0
+}
+
+export function stripLegacyOfflinePatchMarker(record) {
+  const clean = { ...record }
+  delete clean[LEGACY_PATCH_FIELDS]
+  return clean
 }
 
 export function isProtectedOfflineRecord(tableName, record) {

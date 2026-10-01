@@ -3,6 +3,8 @@ import { useAuth } from './useAuth.js'
 import { getSyncRuntimeStatus, synchronizeNow } from '../offline/syncManager.js'
 import { getSyncSnapshot } from '../offline/syncStatus.js'
 
+const EMPTY_SNAPSHOT = { pendingCount: 0, syncedCount: 0, failedCount: 0, conflictCount: 0, queue: [], history: [] }
+
 function currentStatus(isOnline, runtimeStatus, snapshot) {
   if (!isOnline) return 'OFFLINE'
   if (runtimeStatus === 'SYNCING') return 'SYNCING'
@@ -16,14 +18,14 @@ export function useSyncStatus() {
   const { user } = useAuth()
   const [isOnline, setIsOnline] = useState(() => navigator.onLine)
   const [runtimeStatus, setRuntimeStatus] = useState(getSyncRuntimeStatus())
-  const [snapshot, setSnapshot] = useState({ pendingCount: 0, failedCount: 0, conflictCount: 0, queue: [], history: [] })
+  const [snapshot, setSnapshot] = useState(EMPTY_SNAPSHOT)
 
   useEffect(() => {
     let active = true
     const workerId = user?.role === 'ASHA_WORKER' ? user.id : null
 
     async function refresh() {
-      const result = await getSyncSnapshot(workerId).catch(() => ({ pendingCount: 0, failedCount: 0, conflictCount: 0, queue: [], history: [] }))
+      const result = await getSyncSnapshot(workerId).catch(() => EMPTY_SNAPSHOT)
       if (active) setSnapshot(result)
     }
     function handleOnline() { setIsOnline(true); void refresh() }
@@ -49,6 +51,7 @@ export function useSyncStatus() {
     status: currentStatus(isOnline, runtimeStatus, snapshot),
     isOnline,
     pendingCount: snapshot.pendingCount,
+    syncedCount: snapshot.syncedCount,
     failedCount: snapshot.failedCount,
     conflictCount: snapshot.conflictCount,
     queue: snapshot.queue,

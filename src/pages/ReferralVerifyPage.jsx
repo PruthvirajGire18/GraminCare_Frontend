@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth.js'
 import { verifyReferralToken } from '../services/referral.service.js'
+
+const REFERRAL_TOKEN_PATTERN = /^REF-[a-f\d]{64}$/i
 
 function formatDate(value) {
   if (!value) return 'Not recorded'
@@ -9,6 +13,8 @@ function formatDate(value) {
 
 function ReferralVerifyPage() {
   const [token] = useState(() => window.location.hash.slice(1))
+  const { user, loading: authLoading } = useAuth()
+  const navigate = useNavigate()
   const [referral, setReferral] = useState(null)
   const [loading, setLoading] = useState(() => Boolean(token))
   const [error, setError] = useState(() => token ? '' : 'Referral invalid or expired.')
@@ -16,7 +22,12 @@ function ReferralVerifyPage() {
 
   useEffect(() => {
     let active = true
-    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
+    if (authLoading) return () => { active = false }
+    if (user?.role === 'DOCTOR' && REFERRAL_TOKEN_PATTERN.test(token)) {
+      navigate(`/doctor#${token}`, { replace: true })
+      return () => { active = false }
+    }
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`)
     if (!token) {
       return () => { active = false }
     }
@@ -29,7 +40,7 @@ function ReferralVerifyPage() {
       })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [token])
+  }, [authLoading, navigate, token, user?.role])
 
   return (
     <main className="content-width referral-verify-page">

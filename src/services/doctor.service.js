@@ -15,6 +15,11 @@ export async function getDoctorCase(patientId) {
   return data
 }
 
+export async function getDoctorCaseByReferralQr(token) {
+  const { data } = await api.post('/doctor/referrals/lookup', { token })
+  return data
+}
+
 export async function takeDoctorCase(patientId) {
   const { data } = await api.post(`/doctor/cases/${patientId}/take`)
   return data

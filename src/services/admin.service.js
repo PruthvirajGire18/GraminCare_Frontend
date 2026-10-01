@@ -1,8 +1,18 @@
 import api from './api.js'
 
-export async function getUsers() {
-  const { data } = await api.get('/admin/users')
+export async function getUsers(filters = {}) {
+  const { data } = await api.get('/admin/users', { params: filters })
   return data.users
+}
+
+export async function getAdminAnalytics() {
+  const { data } = await api.get('/admin/analytics')
+  return data.analytics
+}
+
+export async function getAuditLogs(filters = {}) {
+  const { data } = await api.get('/admin/audit', { params: filters })
+  return data
 }
 
 export async function approveUser(userId) {

@@ -15,6 +15,7 @@ function makeQueueOperation({ workerId, entityType, operation, payload, localId 
     payload,
     createdAt: new Date().toISOString(),
     retryCount: 0,
+    attemptedAt: null,
     syncStatus: 'PENDING',
     retryable: true,
     nextRetryAt: new Date().toISOString(),
@@ -105,21 +106,22 @@ export async function enqueuePatientUpdate(patient, changes, workerId) {
     lastSyncError: '',
     updatedAt: new Date().toISOString(),
   }
-  const pendingCreate = !patient.serverId
-    ? await offlineDb.syncQueue.where('workerId').equals(workerId).filter((item) => item.entityType === 'PATIENT' && item.operation === 'CREATE' && item.payload.localId === patient.localId && item.syncStatus !== 'SYNCING').first()
-    : null
-  const operation = pendingCreate ? null : makeQueueOperation({
-    workerId,
-    entityType: 'PATIENT',
-    operation: 'UPDATE',
-    payload: { localId: patient.localId, baseVersion: patient.version, baseValues, changes: normalizedChanges },
-  })
-  if (operation) updated.clientOperationId = operation.localId
-
   await offlineDb.transaction('rw', offlineDb.patients, offlineDb.syncQueue, async () => {
-    await offlineDb.patients.put(updated)
+    const pendingCreate = !patient.serverId
+      ? await offlineDb.syncQueue.where('workerId').equals(workerId).filter((item) => (
+        item.entityType === 'PATIENT'
+        && item.operation === 'CREATE'
+        && item.payload.localId === patient.localId
+        && item.syncStatus === 'PENDING'
+        && item.retryCount === 0
+        && !item.attemptedAt
+      )).first()
+      : null
+
     if (pendingCreate) {
-      await offlineDb.syncQueue.update(pendingCreate.queueId, {
+      updated.clientOperationId = pendingCreate.localId
+      await offlineDb.syncQueue.put({
+        ...pendingCreate,
         payload: {
           ...pendingCreate.payload,
           patient: {
@@ -132,8 +134,40 @@ export async function enqueuePatientUpdate(patient, changes, workerId) {
         },
       })
     } else {
-      await offlineDb.syncQueue.add(operation)
+      const pendingUpdate = await offlineDb.syncQueue.where('workerId').equals(workerId).filter((item) => (
+        item.entityType === 'PATIENT'
+        && item.operation === 'UPDATE'
+        && item.payload.localId === patient.localId
+        && item.syncStatus === 'PENDING'
+        && item.retryCount === 0
+        && !item.attemptedAt
+      )).last()
+
+      if (pendingUpdate) {
+        const mergedPayload = mergeQueuedChanges(pendingUpdate, normalizedChanges, baseValues)
+        if (mergedPayload) {
+          updated.clientOperationId = pendingUpdate.localId
+          await offlineDb.syncQueue.put({ ...pendingUpdate, payload: mergedPayload })
+        } else {
+          await offlineDb.syncQueue.delete(pendingUpdate.queueId)
+          const remaining = await offlineDb.syncQueue.where('workerId').equals(workerId).filter((item) => (
+            item.entityType === 'PATIENT' && item.payload.localId === patient.localId
+          )).count()
+          updated.syncStatus = remaining ? 'PENDING' : 'SYNCED'
+          updated.clientOperationId = patient.clientOperationId
+        }
+      } else {
+        const operation = makeQueueOperation({
+          workerId,
+          entityType: 'PATIENT',
+          operation: 'UPDATE',
+          payload: { localId: patient.localId, baseVersion: patient.version, baseValues, changes: normalizedChanges },
+        })
+        updated.clientOperationId = operation.localId
+        await offlineDb.syncQueue.add(operation)
+      }
     }
+    await offlineDb.patients.put(updated)
   })
   notifyOfflineDataChanged()
   return updated
@@ -256,6 +290,40 @@ function applyChanges(record, changes) {
   return updated
 }
 
+function nestChanges(changes) {
+  const nested = {}
+  for (const [path, value] of Object.entries(changes)) {
+    const parts = path.split('.')
+    const leaf = parts.pop()
+    let target = nested
+    for (const part of parts) {
+      target[part] ||= {}
+      target = target[part]
+    }
+    target[leaf] = value
+  }
+  return nested
+}
+
+function mergeQueuedChanges(operation, changes, baseValues) {
+  const mergedChanges = { ...flattenChanges(operation.payload.changes), ...flattenChanges(changes) }
+  const mergedBaseValues = { ...operation.payload.baseValues }
+  for (const [field, value] of Object.entries(baseValues)) {
+    if (!Object.hasOwn(mergedBaseValues, field)) mergedBaseValues[field] = value
+  }
+  for (const [field, value] of Object.entries(mergedChanges)) {
+    if (!valuesEqual(value, mergedBaseValues[field])) continue
+    delete mergedChanges[field]
+    delete mergedBaseValues[field]
+  }
+  if (Object.keys(mergedChanges).length === 0) return null
+  return {
+    ...operation.payload,
+    baseValues: mergedBaseValues,
+    changes: nestChanges(mergedChanges),
+  }
+}
+
 export async function enqueueVisitUpdate(visit, changes, workerId) {
   requireWorkerId(workerId)
   const mergedInput = {
@@ -283,31 +351,64 @@ export async function enqueueVisitUpdate(visit, changes, workerId) {
   updated.syncStatus = 'PENDING'
   updated.lastSyncError = ''
   updated.updatedAt = new Date().toISOString()
-  const pendingCreate = !visit.serverId
-    ? await offlineDb.syncQueue.where('workerId').equals(workerId).filter((item) => item.entityType === 'VISIT' && item.operation === 'CREATE' && item.payload.localId === visit.localId && item.syncStatus !== 'SYNCING').first()
-    : null
-  const operation = pendingCreate ? null : makeQueueOperation({
-    workerId,
-    entityType: 'VISIT',
-    operation: 'UPDATE',
-    payload: {
-      localId: visit.localId,
-      baseVersion: visit.version,
-      baseValues,
-      changes: normalizedChanges,
-    },
-  })
-  if (operation) updated.clientOperationId = operation.localId
-
   await offlineDb.transaction('rw', offlineDb.visits, offlineDb.syncQueue, async () => {
-    await offlineDb.visits.put(updated)
+    const pendingCreate = !visit.serverId
+      ? await offlineDb.syncQueue.where('workerId').equals(workerId).filter((item) => (
+        item.entityType === 'VISIT'
+        && item.operation === 'CREATE'
+        && item.payload.localId === visit.localId
+        && item.syncStatus === 'PENDING'
+        && item.retryCount === 0
+        && !item.attemptedAt
+      )).first()
+      : null
+
     if (pendingCreate) {
-      await offlineDb.syncQueue.update(pendingCreate.queueId, {
+      updated.clientOperationId = pendingCreate.localId
+      await offlineDb.syncQueue.put({
+        ...pendingCreate,
         payload: { ...pendingCreate.payload, visit: applyChanges(pendingCreate.payload.visit, normalizedChanges) },
       })
     } else {
-      await offlineDb.syncQueue.add(operation)
+      const pendingUpdate = await offlineDb.syncQueue.where('workerId').equals(workerId).filter((item) => (
+        item.entityType === 'VISIT'
+        && item.operation === 'UPDATE'
+        && item.payload.localId === visit.localId
+        && item.syncStatus === 'PENDING'
+        && item.retryCount === 0
+        && !item.attemptedAt
+      )).last()
+
+      if (pendingUpdate) {
+        const mergedPayload = mergeQueuedChanges(pendingUpdate, normalizedChanges, baseValues)
+        if (mergedPayload) {
+          updated.clientOperationId = pendingUpdate.localId
+          await offlineDb.syncQueue.put({ ...pendingUpdate, payload: mergedPayload })
+        } else {
+          await offlineDb.syncQueue.delete(pendingUpdate.queueId)
+          const remaining = await offlineDb.syncQueue.where('workerId').equals(workerId).filter((item) => (
+            item.entityType === 'VISIT' && item.payload.localId === visit.localId
+          )).count()
+          updated.syncStatus = remaining ? 'PENDING' : 'SYNCED'
+          updated.clientOperationId = visit.clientOperationId
+        }
+      } else {
+        const operation = makeQueueOperation({
+          workerId,
+          entityType: 'VISIT',
+          operation: 'UPDATE',
+          payload: {
+            localId: visit.localId,
+            baseVersion: visit.version,
+            baseValues,
+            changes: normalizedChanges,
+          },
+        })
+        updated.clientOperationId = operation.localId
+        await offlineDb.syncQueue.add(operation)
+      }
     }
+    await offlineDb.visits.put(updated)
   })
   notifyOfflineDataChanged()
   return updated

@@ -16,6 +16,8 @@ import {
 } from '../offline/ashaData.js'
 import { synchronizeNow } from '../offline/syncManager.js'
 
+const DASHBOARD_CACHE_TTL_MS = 30_000
+
 function currentWorkerId(user) {
   if (!user || user.role !== 'ASHA_WORKER' || user.status !== 'APPROVED') {
     throw new Error('An approved ASHA worker session is required')
@@ -35,7 +37,21 @@ export async function getAshaDashboard() {
   const workerId = currentWorkerId(await getCachedUser())
   const localCounts = await getLocalSyncCounts(workerId)
   const summaryKey = `dashboard:${workerId}`
+  const cachedSummary = await offlineDb.session.get(summaryKey)
+  const cacheAge = Date.now() - Date.parse(cachedSummary?.cachedAt || '')
+
   if (navigator.onLine) {
+    if (cachedSummary?.summary && cacheAge >= 0 && cacheAge < DASHBOARD_CACHE_TTL_MS) {
+      const localChanges = await getPendingDashboardChanges(workerId)
+      return {
+        ...cachedSummary.summary,
+        totalPatients: cachedSummary.summary.totalPatients + localChanges.newPatients,
+        todaysVisits: cachedSummary.summary.todaysVisits + localChanges.todaysVisits,
+        followUps: cachedSummary.summary.followUps + localChanges.followUps,
+        pendingSync: localCounts.pendingSync,
+        syncEnabled: true,
+      }
+    }
     try {
       const { data } = await api.get('/asha/dashboard')
       await offlineDb.session.put({ key: summaryKey, summary: data.summary, cachedAt: new Date().toISOString() })
@@ -52,7 +68,6 @@ export async function getAshaDashboard() {
       if (!canUseLocalFallback(error)) throw error
     }
   }
-  const cachedSummary = await offlineDb.session.get(summaryKey)
   if (cachedSummary?.summary) {
     const localChanges = await getPendingDashboardChanges(workerId)
     return {

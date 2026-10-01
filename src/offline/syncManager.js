@@ -4,9 +4,14 @@ import { getCachedUser } from './session.js'
 
 const MAX_RETRY_DELAY_MS = 5 * 60 * 1000
 const RETRY_INTERVAL_MS = 15000
+const SYNC_REPORT_INTERVAL_MS = 60 * 1000
 let started = false
 let syncing = false
 let runtimeStatus = 'ONLINE'
+let deviceIdCache = ''
+const lastQueueReport = new Map()
+const queuedReports = new Map()
+const reportingWorkers = new Set()
 
 function setRuntimeStatus(status) {
   runtimeStatus = status
@@ -19,8 +24,53 @@ function getErrorMessage(error) {
   return error.response?.data?.message || error.message || 'Synchronization failed'
 }
 
+function getSyncDeviceId() {
+  if (deviceIdCache) return deviceIdCache
+  const key = 'fieldsync-sync-device-id'
+  try {
+    const existing = window.localStorage.getItem(key)
+    if (existing) {
+      deviceIdCache = existing
+      return existing
+    }
+    deviceIdCache = crypto.randomUUID()
+    window.localStorage.setItem(key, deviceIdCache)
+  } catch {
+    deviceIdCache = crypto.randomUUID()
+  }
+  return deviceIdCache
+}
+
+async function reportPendingOperations(workerId, count) {
+  try {
+    if (!window.localStorage) return
+  } catch {
+    return
+  }
+  queuedReports.set(workerId, count)
+  if (reportingWorkers.has(workerId)) return
+  reportingWorkers.add(workerId)
+  try {
+    while (queuedReports.has(workerId)) {
+      const pendingOperations = queuedReports.get(workerId)
+      queuedReports.delete(workerId)
+      const previous = lastQueueReport.get(workerId)
+      if (previous?.count === pendingOperations && Date.now() - previous.at < SYNC_REPORT_INTERVAL_MS) continue
+      try {
+        await api.put('/asha/sync-report', { deviceId: getSyncDeviceId(), pendingOperations })
+        lastQueueReport.set(workerId, { count: pendingOperations, at: Date.now() })
+      } catch {
+        // Reporting is best effort and must never delay patient synchronization.
+        return
+      }
+    }
+  } finally {
+    reportingWorkers.delete(workerId)
+  }
+}
+
 function canRetry(error) {
-  return !error.response || error.response.status === 429 || error.response.status >= 500
+  return !error.response || [408, 425, 429].includes(error.response.status) || error.response.status >= 500
 }
 
 function retryDelay(retryCount) {
@@ -49,7 +99,7 @@ async function syncPatientArchive(operation) {
   const patient = await offlineDb.patients.get(operation.payload.localId)
   if (!patient?.serverId) throw new Error('Patient create must sync before archiving')
   const { data } = await api.delete(`/asha/patients/${patient.serverId}`, {
-    data: { baseVersion: operation.payload.baseVersion, clientOperationId: operation.localId },
+    data: { baseVersion: patient.version ?? operation.payload.baseVersion, clientOperationId: operation.localId },
   })
   return { serverId: patient.serverId, serverRecord: data.patient }
 }
@@ -110,8 +160,19 @@ async function sendOperation(operation) {
 
 async function markEntity(operation, syncStatus, result = {}) {
   const table = operation.entityType === 'PATIENT' ? offlineDb.patients : offlineDb.visits
-  const entityId = operation.entityType === 'PATIENT' ? operation.payload.localId : operation.payload.localId
-  await table.update(entityId, { syncStatus, ...result, lastSyncError: syncStatus === 'SYNCED' ? '' : result.lastSyncError })
+  const entity = await table.get(operation.payload.localId)
+  if (!entity) return
+  const lastSyncError = syncStatus === 'SYNCED'
+    ? ''
+    : Object.hasOwn(result, 'lastSyncError') ? result.lastSyncError : entity.lastSyncError || ''
+  await table.put({ ...entity, syncStatus, ...result, lastSyncError })
+}
+
+async function updateOfflineRecord(table, id, changes) {
+  const record = await table.get(id)
+  if (!record) return false
+  await table.put({ ...record, ...changes })
+  return true
 }
 
 function flattenChangePaths(changes, prefix = '', flattened = {}) {
@@ -226,7 +287,7 @@ async function recordConflict(operation, result) {
         syncedAt: now,
       })
     }
-    await offlineDb.syncQueue.update(operation.queueId, {
+    await updateOfflineRecord(offlineDb.syncQueue, operation.queueId, {
       syncStatus: 'CONFLICT',
       retryable: false,
       nextRetryAt: null,
@@ -255,7 +316,7 @@ async function recordFailure(operation, error) {
   const retryable = canRetry(error)
   const delay = retryable ? retryDelay(retryCount) : null
   await offlineDb.transaction('rw', offlineDb.patients, offlineDb.visits, offlineDb.syncQueue, offlineDb.syncHistory, async () => {
-    await offlineDb.syncQueue.update(operation.queueId, {
+    await updateOfflineRecord(offlineDb.syncQueue, operation.queueId, {
       retryCount,
       syncStatus: 'SYNC_FAILED',
       lastError: getErrorMessage(error),
@@ -297,6 +358,7 @@ async function runQueue({ recheckConflicts = false } = {}) {
   try {
     const queued = (await offlineDb.syncQueue.orderBy('queueId').toArray())
       .filter((operation) => operation.workerId === user.id)
+    void reportPendingOperations(user.id, queued.length)
     let hadFailure = false
     let hadConflict = false
     for (const operation of queued) {
@@ -307,7 +369,11 @@ async function runQueue({ recheckConflicts = false } = {}) {
       if (operation.syncStatus === 'SYNC_FAILED' && (!operation.retryable || Date.parse(operation.nextRetryAt) > Date.now())) {
         continue
       }
-      await offlineDb.syncQueue.update(operation.queueId, { syncStatus: 'SYNCING', lastError: '' })
+      await updateOfflineRecord(offlineDb.syncQueue, operation.queueId, {
+        syncStatus: 'SYNCING',
+        attemptedAt: operation.attemptedAt || new Date().toISOString(),
+        lastError: '',
+      })
       await markEntity(operation, 'SYNCING')
       notifyOfflineDataChanged()
       try {
@@ -328,6 +394,7 @@ async function runQueue({ recheckConflicts = false } = {}) {
     const remaining = await offlineDb.syncQueue.where('workerId').equals(user.id).count()
     const failed = await offlineDb.syncQueue.where('workerId').equals(user.id).filter((item) => item.syncStatus === 'SYNC_FAILED').count()
     const conflicts = await offlineDb.syncQueue.where('workerId').equals(user.id).filter((item) => item.syncStatus === 'CONFLICT').count()
+    void reportPendingOperations(user.id, remaining)
     if (hadConflict || conflicts > 0) setRuntimeStatus('CONFLICT')
     else if (hadFailure || failed > 0) setRuntimeStatus('SYNC_FAILED')
     else if (remaining === 0) setRuntimeStatus('SYNCED')
@@ -343,14 +410,23 @@ export function getSyncRuntimeStatus() {
   return runtimeStatus
 }
 
-export async function synchronizeNow() {
-  return runQueue({ recheckConflicts: true })
+export async function synchronizeNow({ recheckConflicts = true } = {}) {
+  if (navigator.locks?.request) {
+    try {
+      return await navigator.locks.request('fieldsync-sync-queue', { mode: 'exclusive', ifAvailable: true }, (lock) => (
+        lock ? runQueue({ recheckConflicts }) : undefined
+      ))
+    } catch {
+      // Older or restricted browsers still use the per-tab single-run guard.
+    }
+  }
+  return runQueue({ recheckConflicts })
 }
 
 export async function retrySyncOperation(localId, workerId) {
   const operation = await offlineDb.syncQueue.where('localId').equals(localId).first()
   if (!operation || operation.workerId !== workerId) return false
-  await offlineDb.syncQueue.update(operation.queueId, {
+  await updateOfflineRecord(offlineDb.syncQueue, operation.queueId, {
     syncStatus: 'PENDING',
     retryCount: 0,
     retryable: true,
@@ -361,7 +437,7 @@ export async function retrySyncOperation(localId, workerId) {
   })
   await markEntity(operation, 'PENDING', { lastSyncError: '' })
   notifyOfflineDataChanged()
-  void runQueue({ recheckConflicts: true })
+  void synchronizeNow({ recheckConflicts: false })
   return true
 }
 
@@ -370,14 +446,14 @@ export function startSyncManager() {
   started = true
   const handleOnline = () => {
     setRuntimeStatus('ONLINE')
-    void runQueue()
+    void synchronizeNow({ recheckConflicts: false })
   }
   const handleOffline = () => setRuntimeStatus('OFFLINE')
-  const handleSessionChange = () => { void runQueue() }
+  const handleSessionChange = () => { void synchronizeNow({ recheckConflicts: false }) }
   window.addEventListener('online', handleOnline)
   window.addEventListener('offline', handleOffline)
   window.addEventListener('fieldsync:session-change', handleSessionChange)
-  window.setInterval(() => { void runQueue() }, RETRY_INTERVAL_MS)
+  window.setInterval(() => { void synchronizeNow({ recheckConflicts: false }) }, RETRY_INTERVAL_MS)
   setRuntimeStatus(navigator.onLine ? 'ONLINE' : 'OFFLINE')
-  if (navigator.onLine) void runQueue()
+  if (navigator.onLine) void synchronizeNow({ recheckConflicts: false })
 }

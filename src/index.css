@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
 :root {
-  font-family: 'Trebuchet MS', sans-serif;
+  font-family: 'Trebuchet MS', 'Noto Sans Devanagari', 'Nirmala UI', sans-serif;
   color: #20372f;
   background: #f5f7f2;
   font-synthesis: none;
@@ -25,6 +25,8 @@ h1, h2, p { margin-top: 0; }
 
 .page-shell {
   min-height: 100vh;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
   background-image: radial-gradient(#b9c8b9 0.65px, transparent 0.65px);
   background-size: 18px 18px;
 }

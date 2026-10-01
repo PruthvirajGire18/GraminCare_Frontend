@@ -7,6 +7,34 @@
 .doctor-refresh-button:disabled { opacity: .65; cursor: wait; }
 .doctor-dashboard-links { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; color: var(--muted); font-size: 12px; }
 .doctor-dashboard-disclaimer { margin: 0 0 24px; padding: 12px 14px; border-left: 3px solid #648269; color: #455a4c; background: #e9efe6; font-size: 13px; line-height: 1.55; }
+.doctor-qr-lookup { margin: 20px 0 24px; padding: clamp(16px, 3vw, 24px); border: 1px solid var(--line); border-radius: 7px; background: #fffefa; }
+.doctor-qr-lookup-heading, .doctor-qr-patient-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.doctor-qr-lookup-heading h2 { margin: 0; font-family: Georgia, serif; font-size: 25px; font-weight: 500; }
+.doctor-qr-lookup-heading > span, .doctor-qr-patient-heading > span { flex: 0 0 auto; padding: 7px 10px; border-radius: 999px; color: #295c3e; background: #e9f6ec; font-size: 11px; font-weight: 800; }
+.doctor-qr-lookup > p { margin: 11px 0 14px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.doctor-qr-lookup-form { display: grid; gap: 7px; }
+.doctor-qr-lookup-form label { color: var(--muted); font-size: 11px; font-weight: 700; }
+.doctor-qr-lookup-form > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; }
+.doctor-qr-lookup-form input { width: 100%; min-width: 0; padding: 11px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: white; font: inherit; font-size: 13px; }
+.doctor-qr-lookup-form input:focus { outline: 2px solid #92ae88; outline-offset: 1px; }
+.doctor-qr-lookup-form .doctor-primary-button { min-width: 126px; }
+.doctor-qr-lookup-note { display: block; margin-top: 9px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.doctor-qr-patient-card { margin-top: 18px; padding: clamp(14px, 3vw, 20px); border: 1px solid #cdddc5; border-radius: 6px; background: #f8faf5; }
+.doctor-qr-patient-heading { align-items: center; }
+.doctor-qr-patient-heading h3 { margin: 0 0 5px; font-family: Georgia, serif; font-size: 24px; font-weight: 500; overflow-wrap: anywhere; }
+.doctor-qr-patient-heading p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.doctor-qr-record-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.doctor-qr-record-grid section { min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 5px; background: white; }
+.doctor-qr-record-grid h4, .doctor-qr-latest-visit h4 { margin: 0 0 7px; font-size: 12px; }
+.doctor-qr-record-grid p, .doctor-qr-latest-visit p { margin: 0; color: #42564a; font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; white-space: pre-wrap; }
+.doctor-qr-latest-visit { margin-top: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 5px; background: white; }
+.doctor-qr-latest-visit p + p { margin-top: 8px; }
+.doctor-qr-latest-visit dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+.doctor-qr-latest-visit dl > div { min-width: 0; padding: 9px; border-radius: 4px; background: #f1f5ef; }
+.doctor-qr-latest-visit dt { color: var(--muted); font-size: 10px; font-weight: 800; }
+.doctor-qr-latest-visit dd { margin: 4px 0 0; font-size: 12px; font-weight: 800; overflow-wrap: anywhere; }
+.doctor-qr-record-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin-top: 10px; color: var(--muted); font-size: 11px; }
+.doctor-qr-record-footer .doctor-open-case { margin-top: 0; }
 .doctor-case-list { display: grid; gap: 16px; }
 .doctor-case-card { padding: clamp(18px, 4vw, 26px); border: 1px solid var(--line); border-radius: 8px; background: #fffefa; box-shadow: 0 8px 28px #20372f0c; }
 .doctor-case-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
@@ -141,6 +169,11 @@
   .doctor-filters .doctor-search { grid-column: 1 / -1; }
   .doctor-page-heading { flex-direction: column; align-items: stretch !important; }
   .doctor-page-heading .doctor-refresh-button { max-width: none; }
+  .doctor-qr-lookup-heading, .doctor-qr-patient-heading { align-items: flex-start; }
+  .doctor-qr-lookup-form > div { grid-template-columns: 1fr; }
+  .doctor-qr-lookup-form .doctor-primary-button { width: 100%; }
+  .doctor-qr-record-grid { grid-template-columns: 1fr; }
+  .doctor-qr-latest-visit dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .doctor-queue-description { display: grid; gap: 5px; }
   .doctor-patient-header { align-items: stretch; flex-direction: column; padding: 18px; }
   .doctor-assignment-action { justify-content: flex-start; }

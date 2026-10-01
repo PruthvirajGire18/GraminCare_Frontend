@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto'
 import assert from 'node:assert/strict'
 import { afterEach, beforeEach, test } from 'node:test'
 import { offlineDb } from './db.js'
+import { initializeOrUnlockOfflineVault, lockOfflineData } from './offlineVault.js'
 import {
   enqueuePatientArchive,
   enqueuePatientCreate,
@@ -14,9 +15,11 @@ const WORKER_ID = 'asha-user-test-id'
 beforeEach(async () => {
   await offlineDb.delete()
   await offlineDb.open()
+  await initializeOrUnlockOfflineVault({ id: WORKER_ID, email: 'asha@example.test', role: 'ASHA_WORKER', status: 'APPROVED' }, 'offline-test-password-123')
 })
 
 afterEach(async () => {
+  lockOfflineData()
   await offlineDb.delete()
 })
 

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { afterEach, beforeEach, test } from 'node:test'
 import api from '../services/api.js'
 import { offlineDb } from './db.js'
+import { initializeOrUnlockOfflineVault, lockOfflineData } from './offlineVault.js'
 import { cacheUser } from './session.js'
 import { enqueuePatientCreate, enqueuePatientUpdate, enqueueVisitCreate, enqueueVisitUpdate } from './ashaData.js'
 import { getSyncSnapshot } from './syncStatus.js'
@@ -18,6 +19,7 @@ let originalDelete
 beforeEach(async () => {
   await offlineDb.delete()
   await offlineDb.open()
+  await initializeOrUnlockOfflineVault(WORKER, 'offline-test-password-123')
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: true } })
   globalThis.window = new EventTarget()
   originalPost = api.post
@@ -30,6 +32,7 @@ afterEach(async () => {
   api.post = originalPost
   api.patch = originalPatch
   api.delete = originalDelete
+  lockOfflineData()
   await offlineDb.delete()
   if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator)
   else delete globalThis.navigator
